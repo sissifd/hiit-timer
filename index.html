@@ -197,6 +197,63 @@
   }
   .add-btn:hover { border-color:var(--accent); color:var(--accent); }
 
+  /* MODE TOGGLE */
+  .mode-toggle {
+    display: flex; gap: 6px; margin-bottom: 20px;
+    background: var(--surface); border-radius: 10px; padding: 4px;
+  }
+  .mode-btn {
+    flex: 1; background: none; border: none; border-radius: 7px;
+    color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500; padding: 9px 12px;
+    transition: all 0.2s; letter-spacing: 0.3px;
+  }
+  .mode-btn.active {
+    background: var(--card); color: var(--text);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+
+  /* PROGRESSIVE INFO BOX */
+  .progressive-info {
+    background: var(--surface); border: 1px solid #ff8c0033;
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;
+    font-size: 13px; color: var(--muted); line-height: 1.6;
+  }
+  .progressive-info strong { color: var(--accent2); }
+
+  /* PROGRESSIVE PREVIEW */
+  .prog-preview {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; margin-top: 4px;
+  }
+  .prog-preview-header {
+    padding: 10px 14px; font-family: 'Bebas Neue', cursive;
+    font-size: 14px; letter-spacing: 2px; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between;
+  }
+  .prog-preview-row {
+    display: flex; align-items: center; padding: 8px 14px; gap: 10px;
+    border-bottom: 1px solid var(--border); font-size: 13px;
+    transition: background 0.15s;
+  }
+  .prog-preview-row:last-child { border-bottom: none; }
+  .prog-preview-row.final { background: rgba(255,61,61,0.05); }
+  .prog-round {
+    font-family: 'Bebas Neue', cursive; font-size: 18px;
+    color: var(--accent); min-width: 28px;
+  }
+  .prog-bar-wrap { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .prog-bar-work { height: 100%; background: var(--accent); border-radius: 3px; display: inline-block; }
+  .prog-bar-rest { height: 100%; background: var(--rest); border-radius: 3px; display: inline-block; }
+  .prog-times { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .prog-times span { color: var(--text); font-weight: 500; }
+  .prog-summary {
+    padding: 10px 14px; font-size: 12px; color: var(--muted);
+    border-top: 1px solid var(--border); display: flex; gap: 16px;
+  }
+  .prog-summary strong { color: var(--accent2); }
+
   /* BUTTONS */
   .start-btn {
     background: linear-gradient(135deg, var(--accent), var(--accent2));
@@ -488,12 +545,38 @@
 
   <div class="section">
     <div class="section-title">Sets & Pausen</div>
-    <div class="form-row">
-      <div class="form-group"><label>Anzahl Sets</label><input type="number" id="rounds" value="3" min="1" max="20"></div>
-      <div class="form-group"><label>Pause zwischen Übungen (s)</label><input type="number" id="rest-between" value="15" min="0" max="300"></div>
+
+    <!-- Mode Toggle -->
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="mode-standard-btn" onclick="setMode('standard')">Standard</button>
+      <button class="mode-btn" id="mode-progressive-btn" onclick="setMode('progressive')">📉 Progressiv</button>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>Pause zwischen Sets (s)</label><input type="number" id="rest-sets" value="60" min="0" max="600"></div>
+
+    <!-- STANDARD MODE -->
+    <div id="mode-standard">
+      <div class="form-row">
+        <div class="form-group"><label>Anzahl Sets</label><input type="number" id="rounds" value="3" min="1" max="20"></div>
+        <div class="form-group"><label>Pause zwischen Übungen (s)</label><input type="number" id="rest-between" value="15" min="0" max="300"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Pause zwischen Sets (s)</label><input type="number" id="rest-sets" value="60" min="0" max="600"></div>
+      </div>
+    </div>
+
+    <!-- PROGRESSIVE MODE -->
+    <div id="mode-progressive" style="display:none">
+      <div class="progressive-info">
+        Jede Runde hat die gleiche Arbeitszeit, aber die <strong>Pause nimmt pro Runde ab</strong> — bis auf 0. Die Rundenanzahl ergibt sich automatisch.
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Arbeitszeit pro Übung (s)</label><input type="number" id="prog-work" value="30" min="5" max="300" oninput="updateProgressivePreview()"></div>
+        <div class="form-group"><label>Startpause (s)</label><input type="number" id="prog-rest-start" value="30" min="5" max="300" oninput="updateProgressivePreview()"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Reduktion pro Runde (s)</label><input type="number" id="prog-rest-step" value="5" min="1" max="60" oninput="updateProgressivePreview()"></div>
+        <div class="form-group"><label>Pause zwischen Sets (s)</label><input type="number" id="prog-rest-sets" value="60" min="0" max="600"></div>
+      </div>
+      <div class="prog-preview" id="prog-preview"></div>
     </div>
   </div>
 
@@ -838,6 +921,8 @@ function renderExercises() {
       <button class="del-btn" onclick="removeExercise(${ex.id})">✕</button>`;
     list.appendChild(div);
   });
+  // Refresh progressive preview when exercise count changes
+  if (workoutMode === 'progressive') updateProgressivePreview();
 }
 addExercise('Burpees', 30);
 addExercise('Mountain Climbers', 40);
@@ -866,13 +951,20 @@ async function confirmSave() {
   if (!exercises.length) { alert('Mindestens eine Übung nötig!'); closeModal(); return; }
   closeModal();
 
+  const isProgressive = workoutMode === 'progressive';
   const workout = {
     id: Date.now(),
     name,
+    mode: workoutMode,
     exercises: exercises.map(e => ({ name: e.name||'Übung', duration: e.duration })),
-    rounds: +document.getElementById('rounds').value || 3,
-    restBetween: +document.getElementById('rest-between').value || 15,
-    restSets: +document.getElementById('rest-sets').value || 60,
+    // Standard mode fields
+    rounds:      isProgressive ? null : (+document.getElementById('rounds').value || 3),
+    restBetween: isProgressive ? null : (+document.getElementById('rest-between').value || 15),
+    restSets:    isProgressive ? (+document.getElementById('prog-rest-sets').value || 60) : (+document.getElementById('rest-sets').value || 60),
+    // Progressive mode fields
+    progWork:      isProgressive ? (+document.getElementById('prog-work').value || 30)      : null,
+    progRestStart: isProgressive ? (+document.getElementById('prog-rest-start').value || 30) : null,
+    progRestStep:  isProgressive ? (+document.getElementById('prog-rest-step').value || 5)   : null,
     savedAt: new Date().toISOString()
   };
 
@@ -923,11 +1015,22 @@ async function renderSaved() {
   c.innerHTML = '<div class="saved-grid" id="saved-grid"></div>';
   const grid = document.getElementById('saved-grid');
   saved.forEach(w => {
-    const totalMin = Math.round((
-      w.exercises.reduce((a,e)=>a+e.duration,0)*w.rounds
-      + (w.restBetween||0)*Math.max(0,w.exercises.length-1)*w.rounds
-      + (w.restSets||0)*Math.max(0,w.rounds-1)
+    let totalMin;
+  if (w.mode === 'progressive' && w.progWork && w.progRestStart && w.progRestStep) {
+    let secs = 0, rest = w.progRestStart;
+    while (rest >= 0) {
+      secs += w.exercises.length * w.progWork;
+      secs += Math.max(0, w.exercises.length-1) * rest;
+      rest -= w.progRestStep;
+    }
+    totalMin = Math.round(secs / 60);
+  } else {
+    totalMin = Math.round((
+      w.exercises.reduce((a,e)=>a+e.duration,0)*(w.rounds||1)
+      + (w.restBetween||0)*Math.max(0,w.exercises.length-1)*(w.rounds||1)
+      + (w.restSets||0)*Math.max(0,(w.rounds||1)-1)
     ) / 60);
+  }
     const card = document.createElement('div');
     card.className = 'saved-card';
     card.innerHTML = `
@@ -935,8 +1038,8 @@ async function renderSaved() {
         <div class="saved-card-name">${w.name}</div>
         <div class="saved-card-meta">Gespeichert: ${fmtDate(w.savedAt)}</div>
         <div class="saved-card-tags">
+          ${w.mode === 'progressive' ? '<span class="tag set">📉 Progressiv</span>' : `<span class="tag set">🔄 ${w.rounds} Sets</span>`}
           <span class="tag work">🔥 ${w.exercises.length} Übungen</span>
-          <span class="tag set">🔄 ${w.rounds} Sets</span>
           <span class="tag rest">⏱ ~${totalMin} Min</span>
         </div>
       </div>
@@ -952,10 +1055,21 @@ function loadWorkout(w) {
   if (typeof w === 'string') w = JSON.parse(w);
   exercises=[]; exCount=0;
   w.exercises.forEach(e => addExercise(e.name, e.duration));
-  document.getElementById('rounds').value = w.rounds;
-  document.getElementById('rest-between').value = w.restBetween;
-  document.getElementById('rest-sets').value = w.restSets;
   document.getElementById('workout-name').value = w.name;
+
+  if (w.mode === 'progressive') {
+    setMode('progressive');
+    document.getElementById('prog-work').value       = w.progWork      || 30;
+    document.getElementById('prog-rest-start').value = w.progRestStart || 30;
+    document.getElementById('prog-rest-step').value  = w.progRestStep  || 5;
+    document.getElementById('prog-rest-sets').value  = w.restSets      || 60;
+    updateProgressivePreview();
+  } else {
+    setMode('standard');
+    document.getElementById('rounds').value      = w.rounds      || 3;
+    document.getElementById('rest-between').value = w.restBetween || 15;
+    document.getElementById('rest-sets').value    = w.restSets    || 60;
+  }
   showPage('setup');
 }
 
@@ -1025,22 +1139,117 @@ async function clearHistory() {
   renderHistory();
 }
 
+// ── WORKOUT MODE ──
+let workoutMode = 'standard'; // 'standard' | 'progressive'
+
+function setMode(mode) {
+  workoutMode = mode;
+  document.getElementById('mode-standard').style.display = mode === 'standard' ? 'block' : 'none';
+  document.getElementById('mode-progressive').style.display = mode === 'progressive' ? 'block' : 'none';
+  document.getElementById('mode-standard-btn').classList.toggle('active', mode === 'standard');
+  document.getElementById('mode-progressive-btn').classList.toggle('active', mode === 'progressive');
+  if (mode === 'progressive') updateProgressivePreview();
+}
+
+function getProgressiveRounds() {
+  const restStart = +document.getElementById('prog-rest-start').value || 30;
+  const restStep  = +document.getElementById('prog-rest-step').value  || 5;
+  // rounds: restStart=30, step=5 → 30,25,20,15,10,5,0 = 7 rounds
+  const rounds = [];
+  for (let rest = restStart; rest >= 0; rest -= restStep) {
+    rounds.push(rest);
+  }
+  return rounds;
+}
+
+function updateProgressivePreview() {
+  const work      = +document.getElementById('prog-work').value       || 30;
+  const restStart = +document.getElementById('prog-rest-start').value || 30;
+  const restStep  = +document.getElementById('prog-rest-step').value  || 5;
+  const rounds    = getProgressiveRounds();
+  const exCount   = exercises.length || 6;
+  const maxTotal  = work + restStart;
+
+  let totalSec = 0;
+  rounds.forEach(rest => {
+    totalSec += exCount * work;
+    totalSec += Math.max(0, exCount - 1) * rest;
+  });
+  const restSets = +document.getElementById('prog-rest-sets').value || 0;
+  totalSec += (rounds.length - 1) * restSets;
+
+  const container = document.getElementById('prog-preview');
+  if (!rounds.length) { container.innerHTML = ''; return; }
+
+  let html = `<div class="prog-preview-header">
+    <span>RUNDE</span><span>ARBEIT / PAUSE</span><span>PRO ÜBUNG</span>
+  </div>`;
+
+  rounds.forEach((rest, i) => {
+    const isFinal = rest === 0;
+    const workPct = maxTotal > 0 ? (work / maxTotal * 100) : 50;
+    const restPct = maxTotal > 0 ? (rest / maxTotal * 100) : 50;
+    html += `<div class="prog-preview-row${isFinal ? ' final' : ''}">
+      <div class="prog-round">${i + 1}</div>
+      <div class="prog-bar-wrap">
+        <span class="prog-bar-work" style="width:${workPct}%"></span>
+        <span class="prog-bar-rest" style="width:${restPct}%"></span>
+      </div>
+      <div class="prog-times">
+        <span>${work}s</span> Arbeit${rest > 0 ? ` + <span>${rest}s</span> Pause` : ' <span style="color:var(--accent)">🔥 Kein Rest!</span>'}
+      </div>
+    </div>`;
+  });
+
+  const totalMin = Math.floor(totalSec / 60);
+  const totalS   = totalSec % 60;
+  html += `<div class="prog-summary">
+    <span>🔄 <strong>${rounds.length} Runden</strong></span>
+    <span>💪 ${exCount} Übungen</span>
+    <span>⏱ ~${totalMin}:${String(totalS).padStart(2,'0')} Min</span>
+  </div>`;
+
+  container.innerHTML = html;
+}
+
 // ── START WORKOUT ──
 function startWorkout() {
   if(!exercises.length) { alert('Füge mindestens eine Übung hinzu!'); return; }
-  const rounds = +document.getElementById('rounds').value || 3;
-  const restBetween = +document.getElementById('rest-between').value || 0;
-  const restSets = +document.getElementById('rest-sets').value || 0;
   queue = [];
-  for(let s=0;s<rounds;s++) {
-    exercises.forEach((ex,ei) => {
-      queue.push({type:'work', duration:ex.duration, name:ex.name||`Übung ${ei+1}`, setIdx:s});
-      if(ei<exercises.length-1 && restBetween>0)
-        queue.push({type:'rest', duration:restBetween, name:'PAUSE', setIdx:s});
+
+  if (workoutMode === 'progressive') {
+    // ── PROGRESSIVE MODE ──
+    const work     = +document.getElementById('prog-work').value       || 30;
+    const restSets = +document.getElementById('prog-rest-sets').value  || 0;
+    const rounds   = getProgressiveRounds();
+
+    rounds.forEach((rest, s) => {
+      exercises.forEach((ex, ei) => {
+        queue.push({ type:'work', duration: work, name: ex.name || `Übung ${ei+1}`, setIdx: s, restThisRound: rest });
+        if (ei < exercises.length - 1 && rest > 0)
+          queue.push({ type:'rest', duration: rest, name:'PAUSE', setIdx: s });
+      });
+      if (s < rounds.length - 1 && restSets > 0)
+        queue.push({ type:'set-rest', duration: restSets, name:'SET PAUSE', setIdx: s });
     });
-    if(s<rounds-1 && restSets>0)
-      queue.push({type:'set-rest', duration:restSets, name:'SET PAUSE', setIdx:s});
+
+  } else {
+    // ── STANDARD MODE ──
+    const rounds      = +document.getElementById('rounds').value       || 3;
+    const restBetween = +document.getElementById('rest-between').value || 0;
+    const restSets    = +document.getElementById('rest-sets').value    || 0;
+
+    for(let s=0;s<rounds;s++) {
+      exercises.forEach((ex,ei) => {
+        queue.push({type:'work', duration:ex.duration, name:ex.name||`Übung ${ei+1}`, setIdx:s});
+        if(ei<exercises.length-1 && restBetween>0)
+          queue.push({type:'rest', duration:restBetween, name:'PAUSE', setIdx:s});
+      });
+      if(s<rounds-1 && restSets>0)
+        queue.push({type:'set-rest', duration:restSets, name:'SET PAUSE', setIdx:s});
+    }
   }
+
   totalPhases=queue.length; qIdx=0; isPaused=false;
   workoutStartTime=Date.now();
   document.getElementById('main-nav').style.display='none';
@@ -1053,8 +1262,13 @@ function loadPhase() {
   if(qIdx>=queue.length){finish();return;}
   const ph=queue[qIdx]; timeLeft=ph.duration;
   document.body.className=ph.type==='work'?'phase-work':ph.type==='rest'?'phase-rest':'phase-set';
-  const rounds=+document.getElementById('rounds').value||3;
-  document.getElementById('round-info').textContent=`SET ${ph.setIdx+1} / ${rounds}`;
+  const totalRounds = workoutMode === 'progressive'
+    ? getProgressiveRounds().length
+    : (+document.getElementById('rounds').value || 3);
+  const restLabel = workoutMode === 'progressive' && ph.restThisRound !== undefined
+    ? (ph.restThisRound === 0 ? ' 🔥' : ` · ${ph.restThisRound}s Pause`)
+    : '';
+  document.getElementById('round-info').textContent=`SET ${ph.setIdx+1} / ${totalRounds}${restLabel}`;
   document.getElementById('phase-label').textContent=ph.type==='work'?'ÜBUNG':ph.type==='rest'?'PAUSE':'SET PAUSE';
   document.getElementById('exercise-name').textContent=ph.name;
   updateRing(ph.duration,ph.duration); updateTimerDisplay(timeLeft); updateNextInfo(); updateProgress();
