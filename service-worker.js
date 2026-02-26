@@ -1,6 +1,6 @@
 // HIIT Timer Service Worker
 // Version — bump this to force cache refresh after updates
-const CACHE_VERSION = 'hiit-v1';
+const CACHE_VERSION = 'hiit-v2';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const FONT_CACHE    = `${CACHE_VERSION}-fonts`;
 
