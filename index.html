@@ -553,8 +553,7 @@ input:focus { border-color: var(--red); }
 <script type="module">
 import { initializeApp }                                      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, OAuthProvider,
-         signInWithRedirect, getRedirectResult,
-         signOut, onAuthStateChanged }                        from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+         signInWithPopup, signOut, onAuthStateChanged }       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, doc, setDoc, getDocs,
          deleteDoc, addDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -569,33 +568,21 @@ const app  = initializeApp({
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
-// Redirect result (silent — onAuthStateChanged picks up the user)
-getRedirectResult(auth).catch(e => console.warn('redirect:', e.code));
-
 // Auth state → notify app via event
 onAuthStateChanged(auth, user => {
   window.dispatchEvent(new CustomEvent('fb-auth', { detail: user }));
 });
 
-// Login helpers
-window.fbLoginGoogle = () => {
-  document.getElementById('loading-hint').textContent = 'Weiterleiten zu Google…';
-  document.getElementById('loading').style.display = 'flex';
-  signInWithRedirect(auth, new GoogleAuthProvider()).catch(e => {
-    document.getElementById('loading').style.display = 'none';
-    alert('Fehler: ' + e.message);
-  });
-};
-window.fbLoginApple = () => {
-  document.getElementById('loading-hint').textContent = 'Weiterleiten zu Apple…';
-  document.getElementById('loading').style.display = 'flex';
+// signInWithPopup must be called directly from a user gesture.
+// We store the providers here and call popup from the button click handlers in app.js.
+window.fbAuth = auth;
+window.fbGoogleProvider = new GoogleAuthProvider();
+window.fbAppleProvider  = (() => {
   const p = new OAuthProvider('apple.com');
   p.addScope('email'); p.addScope('name');
-  signInWithRedirect(auth, p).catch(e => {
-    document.getElementById('loading').style.display = 'none';
-    alert('Fehler: ' + e.message);
-  });
-};
+  return p;
+})();
+window.fbSignInWithPopup = signInWithPopup;
 window.fbLogout = () => signOut(auth);
 
 // Firestore
@@ -663,11 +650,23 @@ function enterApp(user) {
 }
 
 // ─── Login buttons ────────────────────────────────
-document.getElementById('btn-google').addEventListener('click', () => {
-  if (window.fbLoginGoogle) window.fbLoginGoogle();
+document.getElementById('btn-google').addEventListener('click', async () => {
+  // Must be called directly in user-gesture handler — no async gap before signInWithPopup
+  if (!window.fbSignInWithPopup) { showToast('Firebase lädt noch, bitte kurz warten…', 'err'); return; }
+  try {
+    await window.fbSignInWithPopup(window.fbAuth, window.fbGoogleProvider);
+    // onAuthStateChanged fires → fb-auth event → enterApp()
+  } catch(e) {
+    if (e.code !== 'auth/popup-closed-by-user') showToast('Anmeldung fehlgeschlagen: ' + e.code, 'err');
+  }
 });
-document.getElementById('btn-apple').addEventListener('click', () => {
-  if (window.fbLoginApple) window.fbLoginApple();
+document.getElementById('btn-apple').addEventListener('click', async () => {
+  if (!window.fbSignInWithPopup) { showToast('Firebase lädt noch, bitte kurz warten…', 'err'); return; }
+  try {
+    await window.fbSignInWithPopup(window.fbAuth, window.fbAppleProvider);
+  } catch(e) {
+    if (e.code !== 'auth/popup-closed-by-user') showToast('Anmeldung fehlgeschlagen: ' + e.code, 'err');
+  }
 });
 document.getElementById('btn-guest').addEventListener('click', () => {
   isGuest = true;
