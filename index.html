@@ -469,7 +469,7 @@
 <div class="toast" id="toast"></div>
 
 <!-- ══ LOGIN VIEW ══ -->
-<div id="login-view">
+<div id="login-view" style="display:none">
   <div class="login-logo">HIIT</div>
   <div class="login-sub">Interval Timer</div>
 
@@ -656,9 +656,6 @@
 <script type="module">
 // ════════════════════════════════════════════════════════
 //  FIREBASE CONFIG
-//  Ersetze die Werte unten mit deiner eigenen Firebase-Config.
-//  Diese findest du in der Firebase Console unter:
-//  Projekteinstellungen → Deine Apps → SDK-Konfiguration
 // ════════════════════════════════════════════════════════
 const FIREBASE_CONFIG = {
   apiKey:            "AIzaSyCy8beUOiESaFPQNaoRIQueuW3k2pj-xBM",
@@ -679,138 +676,110 @@ import { getFirestore, collection, doc, setDoc,
          getDoc, getDocs, deleteDoc, addDoc,
          query, orderBy, serverTimestamp }         from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// ── Detect placeholder config ──
-const IS_CONFIGURED = FIREBASE_CONFIG.apiKey !== "DEINE_API_KEY" && FIREBASE_CONFIG.apiKey.length > 10;
-
-let app, auth, db, currentUser = null;
-let useCloud = false;
-
-if (IS_CONFIGURED) {
-  try {
-    app  = initializeApp(FIREBASE_CONFIG);
-    auth = getAuth(app);
-    db   = getFirestore(app);
-    useCloud = true;
-  } catch(e) {
-    console.warn("Firebase init failed:", e);
-    useCloud = false;
-  }
-} else {
-  document.getElementById('firebase-setup-notice').style.display = 'block';
+// ── Init Firebase ──
+let app, auth, db;
+try {
+  app  = initializeApp(FIREBASE_CONFIG);
+  auth = getAuth(app);
+  db   = getFirestore(app);
+} catch(e) {
+  console.error("Firebase init failed:", e);
 }
 
-// Make helpers available globally
-window._fb = { useCloud, auth, db, currentUser: null,
-  GoogleAuthProvider, OAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged,
-  collection, doc, setDoc, getDoc, getDocs, deleteDoc, addDoc, query, orderBy, serverTimestamp
+// ── Expose to global scope ──
+window._fb = {
+  auth, db,
+  GoogleAuthProvider, OAuthProvider,
+  signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged,
+  collection, doc, setDoc, getDoc, getDocs, deleteDoc, addDoc,
+  query, orderBy, serverTimestamp,
+  currentUser: null,
+  useCloud: true
 };
 
-// ── AUTH STATE ──
-if (useCloud && auth) {
-  // First check if we're returning from a redirect login
-  showLoading('Anmelden…');
-  getRedirectResult(auth).then(result => {
-    // result handled by onAuthStateChanged below
-  }).catch(err => {
-    console.warn('Redirect result error:', err);
-    hideLoading();
-  });
+// ── Auth state — runs after page load so all JS functions exist ──
+window.addEventListener('load', () => {
+
+  // Handle return from Google/Apple redirect (silent, result goes to onAuthStateChanged)
+  getRedirectResult(auth).catch(e => console.warn('redirect result:', e));
 
   onAuthStateChanged(auth, user => {
     window._fb.currentUser = user;
     if (user) {
-      onUserLoggedIn(user);
+      // Logged in
+      window._appOnLogin(user);
     } else {
-      showLoginView();
+      // Not logged in — show login screen
+      window._appShowLogin();
     }
-    hideLoading();
   });
-} else {
-  hideLoading();
-  if (!IS_CONFIGURED) {
-    continueAsGuest();
-  }
-}
+});
 
-// ── EXPOSE AUTH ACTIONS ──
-window.loginGoogle = async () => {
-  if (!useCloud) { continueAsGuest(); return; }
-  showLoading("Weiterleiten zu Google…");
-  try {
-    const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
-    // Page will reload after redirect — onAuthStateChanged handles the result
-  } catch(e) {
-    hideLoading();
-    showToast("Anmeldung fehlgeschlagen: " + e.message, 'error');
-  }
+// ── Login actions ──
+window.loginGoogle = () => {
+  document.getElementById('loading-text').textContent = 'Weiterleiten zu Google…';
+  document.getElementById('loading-overlay').classList.add('show');
+  signInWithRedirect(auth, new GoogleAuthProvider())
+    .catch(e => {
+      document.getElementById('loading-overlay').classList.remove('show');
+      alert('Fehler: ' + e.message);
+    });
 };
 
-window.loginApple = async () => {
-  if (!useCloud) { continueAsGuest(); return; }
-  showLoading("Weiterleiten zu Apple…");
-  try {
-    const provider = new OAuthProvider('apple.com');
-    provider.addScope('email');
-    provider.addScope('name');
-    await signInWithRedirect(auth, provider);
-    // Page will reload after redirect — onAuthStateChanged handles the result
-  } catch(e) {
-    hideLoading();
-    showToast("Apple-Anmeldung fehlgeschlagen: " + e.message, 'error');
-  }
+window.loginApple = () => {
+  document.getElementById('loading-text').textContent = 'Weiterleiten zu Apple…';
+  document.getElementById('loading-overlay').classList.add('show');
+  const p = new OAuthProvider('apple.com');
+  p.addScope('email'); p.addScope('name');
+  signInWithRedirect(auth, p)
+    .catch(e => {
+      document.getElementById('loading-overlay').classList.remove('show');
+      alert('Fehler: ' + e.message);
+    });
 };
 
 window.handleLogout = async () => {
-  closeUserMenu();
-  if (useCloud && auth) {
-    await signOut(auth);
-  } else {
-    showLoginView();
-  }
+  if (typeof closeUserMenu === 'function') closeUserMenu();
+  await signOut(auth);
 };
 
-// ── FIRESTORE HELPERS ──
-async function fsGetWorkouts(uid) {
-  const fb = window._fb;
-  const q = query(collection(fb.db, `users/${uid}/workouts`), orderBy('savedAt','desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-}
-async function fsSaveWorkout(uid, workout) {
-  const fb = window._fb;
-  const ref = workout.id
-    ? doc(fb.db, `users/${uid}/workouts`, String(workout.id))
-    : doc(collection(fb.db, `users/${uid}/workouts`));
-  await setDoc(ref, { ...workout, id: ref.id, savedAt: fb.serverTimestamp() });
-  return ref.id;
-}
-async function fsDeleteWorkout(uid, id) {
-  const fb = window._fb;
-  await deleteDoc(doc(fb.db, `users/${uid}/workouts`, String(id)));
-}
-async function fsAddHistory(uid, entry) {
-  const fb = window._fb;
-  const ref = await addDoc(collection(fb.db, `users/${uid}/history`), { ...entry, date: fb.serverTimestamp() });
-  return ref.id;
-}
-async function fsGetHistory(uid) {
-  const fb = window._fb;
-  const q = query(collection(fb.db, `users/${uid}/history`), orderBy('date','desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data(), date: d.data().date?.toDate?.().toISOString() || new Date().toISOString() }));
-}
-async function fsClearHistory(uid) {
-  const fb = window._fb;
-  const snap = await getDocs(collection(fb.db, `users/${uid}/history`));
-  await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
-}
-
-window._fsOps = { fsGetWorkouts, fsSaveWorkout, fsDeleteWorkout, fsAddHistory, fsGetHistory, fsClearHistory };
-
+// ── Firestore helpers ──
+window._fsOps = {
+  async fsGetWorkouts(uid) {
+    const q = query(collection(db, `users/${uid}/workouts`), orderBy('savedAt','desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  },
+  async fsSaveWorkout(uid, workout) {
+    const ref = workout.id
+      ? doc(db, `users/${uid}/workouts`, String(workout.id))
+      : doc(collection(db, `users/${uid}/workouts`));
+    await setDoc(ref, { ...workout, id: ref.id, savedAt: serverTimestamp() });
+    return ref.id;
+  },
+  async fsDeleteWorkout(uid, id) {
+    await deleteDoc(doc(db, `users/${uid}/workouts`, String(id)));
+  },
+  async fsAddHistory(uid, entry) {
+    const ref = await addDoc(collection(db, `users/${uid}/history`), { ...entry, date: serverTimestamp() });
+    return ref.id;
+  },
+  async fsGetHistory(uid) {
+    const q = query(collection(db, `users/${uid}/history`), orderBy('date','desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({
+      id: d.id, ...d.data(),
+      date: d.data().date?.toDate?.().toISOString() || new Date().toISOString()
+    }));
+  },
+  async fsClearHistory(uid) {
+    const snap = await getDocs(collection(db, `users/${uid}/history`));
+    await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+  }
+};
 </script>
 
-<script>
+<script>>
 // ════════════════════════════════════════════════════════
 //  APP STATE
 // ════════════════════════════════════════════════════════
@@ -843,10 +812,14 @@ function showLoginView() {
   document.getElementById('main-nav').style.display = 'none';
   document.querySelectorAll('.page').forEach(p => { p.style.display='none'; p.classList.remove('active'); });
 }
+// Callbacks invoked by Firebase module
+window._appShowLogin = showLoginView;
+window._appOnLogin   = onUserLoggedIn;
 
 function onUserLoggedIn(user) {
   isGuest = false;
   document.getElementById('login-view').style.display = 'none';
+  document.getElementById('loading-overlay').classList.remove('show');
   document.getElementById('main-nav').style.display = 'flex';
 
   // Avatar
@@ -871,6 +844,7 @@ function onUserLoggedIn(user) {
 window.continueAsGuest = function() {
   isGuest = true;
   document.getElementById('login-view').style.display = 'none';
+  document.getElementById('loading-overlay').classList.remove('show');
   document.getElementById('main-nav').style.display = 'flex';
   document.getElementById('user-name-chip').textContent = 'Gast';
   document.getElementById('menu-display-name').textContent = 'Gast-Modus';
@@ -949,7 +923,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function lsGet(key) { try { return JSON.parse(localStorage.getItem(key)||'[]'); } catch { return []; } }
 function lsSet(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 function lsKey(suffix) {
-  const uid = window._fb?.currentUser?.uid;
+  const uid = window._fb && window._fb.currentUser ? window._fb.currentUser.uid : null;
   return uid ? `hiit_${uid}_${suffix}` : `hiit_guest_${suffix}`;
 }
 
@@ -985,8 +959,8 @@ async function confirmSave() {
     savedAt: new Date().toISOString()
   };
 
-  const uid = window._fb?.currentUser?.uid;
-  if (!isGuest && uid && window._fb?.useCloud) {
+  const uid = window._fb && window._fb.currentUser ? window._fb.currentUser.uid : null;
+  if (!isGuest && uid && window._fsOps) {
     showLoading('Speichern…');
     try {
       await window._fsOps.fsSaveWorkout(uid, workout);
@@ -1016,8 +990,8 @@ async function renderSaved() {
   c.innerHTML = '<div style="text-align:center;padding:32px"><div class="spinner"></div></div>';
 
   let saved = [];
-  const uid = window._fb?.currentUser?.uid;
-  if (!isGuest && uid && window._fb?.useCloud) {
+  const uid = window._fb && window._fb.currentUser ? window._fb.currentUser.uid : null;
+  if (!isGuest && uid && window._fsOps) {
     try { saved = await window._fsOps.fsGetWorkouts(uid); }
     catch(e) { saved = lsGet(lsKey('saved')); }
   } else {
@@ -1092,8 +1066,8 @@ function loadWorkout(w) {
 
 async function deleteSaved(id) {
   showConfirm('Workout löschen', 'Dieses Workout wird dauerhaft gelöscht.', async () => {
-  const uid = window._fb?.currentUser?.uid;
-  if (!isGuest && uid && window._fb?.useCloud) {
+  const uid = window._fb && window._fb.currentUser ? window._fb.currentUser.uid : null;
+  if (!isGuest && uid && window._fsOps) {
     showLoading('Löschen…');
     try { await window._fsOps.fsDeleteWorkout(uid, id); hideLoading(); showToast('Gelöscht'); }
     catch(e) { hideLoading(); showToast('Fehler: '+e.message,'error'); return; }
@@ -1109,8 +1083,8 @@ async function renderHistory() {
   c.innerHTML = '<div style="text-align:center;padding:32px"><div class="spinner"></div></div>';
 
   let history = [];
-  const uid = window._fb?.currentUser?.uid;
-  if (!isGuest && uid && window._fb?.useCloud) {
+  const uid = window._fb && window._fb.currentUser ? window._fb.currentUser.uid : null;
+  if (!isGuest && uid && window._fsOps) {
     try { history = await window._fsOps.fsGetHistory(uid); }
     catch(e) { history = lsGet(lsKey('history')); }
   } else {
@@ -1145,8 +1119,8 @@ async function renderHistory() {
 
 async function clearHistory() {
   showConfirm('Verlauf löschen', 'Der gesamte Workout-Verlauf wird unwiderruflich gelöscht.', async () => {
-  const uid = window._fb?.currentUser?.uid;
-  if (!isGuest && uid && window._fb?.useCloud) {
+  const uid = window._fb && window._fb.currentUser ? window._fb.currentUser.uid : null;
+  if (!isGuest && uid && window._fsOps) {
     showLoading('Löschen…');
     try { await window._fsOps.fsClearHistory(uid); hideLoading(); }
     catch(e) { hideLoading(); showToast('Fehler','error'); return; }
@@ -1352,7 +1326,7 @@ async function finish() {
   };
 
   const uid=window._fb?.currentUser?.uid;
-  if(!isGuest && uid && window._fb?.useCloud) {
+  if(!isGuest && uid && window._fsOps) {
     try { await window._fsOps.fsAddHistory(uid, entry); }
     catch(e) { console.warn('History save failed', e); }
   } else {
