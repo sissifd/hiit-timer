@@ -207,6 +207,8 @@
     color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif;
     font-size: 13px; font-weight: 500; padding: 9px 12px;
     transition: all 0.2s; letter-spacing: 0.3px;
+    pointer-events: all; user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: rgba(255,255,255,0.1);
   }
   .mode-btn.active {
     background: var(--card); color: var(--text);
@@ -549,7 +551,7 @@
     <!-- Mode Toggle -->
     <div class="mode-toggle">
       <button class="mode-btn active" id="mode-standard-btn" onclick="setMode('standard')">Standard</button>
-      <button class="mode-btn" id="mode-progressive-btn" onclick="setMode('progressive')">📉 Progressiv</button>
+      <button class="mode-btn" id="mode-progressive-btn" onclick="setMode('progressive')">Progressiv</button>
     </div>
 
     <!-- STANDARD MODE -->
