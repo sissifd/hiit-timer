@@ -579,12 +579,13 @@
 //  Projekteinstellungen → Deine Apps → SDK-Konfiguration
 // ════════════════════════════════════════════════════════
 const FIREBASE_CONFIG = {
-  apiKey:            "DEINE_API_KEY",
-  authDomain:        "DEIN_PROJEKT.firebaseapp.com",
-  projectId:         "DEIN_PROJEKT",
-  storageBucket:     "DEIN_PROJEKT.appspot.com",
-  messagingSenderId: "DEINE_SENDER_ID",
-  appId:             "DEINE_APP_ID"
+  apiKey:            "AIzaSyCy8beUOiESaFPQNaoRIQueuW3k2pj-xBM",
+  authDomain:        "hiit-timer-bfd44.firebaseapp.com",
+  projectId:         "hiit-timer-bfd44",
+  storageBucket:     "hiit-timer-bfd44.firebasestorage.app",
+  messagingSenderId: "1014349827827",
+  appId:             "1:1014349827827:web:9cfd972c811a55ec2b7186",
+  measurementId:     "G-L54NVPD0WE"
 };
 // ════════════════════════════════════════════════════════
 
@@ -597,7 +598,7 @@ import { getFirestore, collection, doc, setDoc,
          query, orderBy, serverTimestamp }         from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ── Detect placeholder config ──
-const IS_CONFIGURED = FIREBASE_CONFIG.apiKey !== "DEINE_API_KEY";
+const IS_CONFIGURED = FIREBASE_CONFIG.apiKey !== "AIzaSyCy8beUOiESaFPQNaoRIQueuW3k2pj-xBM";
 
 let app, auth, db, currentUser = null;
 let useCloud = false;
