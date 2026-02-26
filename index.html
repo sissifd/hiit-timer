@@ -673,7 +673,7 @@ const FIREBASE_CONFIG = {
 
 import { initializeApp }                          from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, OAuthProvider,
-         signInWithPopup, signOut, onAuthStateChanged }
+         signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged }
                                                    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, doc, setDoc,
          getDoc, getDocs, deleteDoc, addDoc,
@@ -701,12 +701,21 @@ if (IS_CONFIGURED) {
 
 // Make helpers available globally
 window._fb = { useCloud, auth, db, currentUser: null,
-  GoogleAuthProvider, OAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+  GoogleAuthProvider, OAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged,
   collection, doc, setDoc, getDoc, getDocs, deleteDoc, addDoc, query, orderBy, serverTimestamp
 };
 
 // ── AUTH STATE ──
 if (useCloud && auth) {
+  // First check if we're returning from a redirect login
+  showLoading('Anmelden…');
+  getRedirectResult(auth).then(result => {
+    // result handled by onAuthStateChanged below
+  }).catch(err => {
+    console.warn('Redirect result error:', err);
+    hideLoading();
+  });
+
   onAuthStateChanged(auth, user => {
     window._fb.currentUser = user;
     if (user) {
@@ -718,7 +727,6 @@ if (useCloud && auth) {
   });
 } else {
   hideLoading();
-  // Show app directly in guest mode if not configured
   if (!IS_CONFIGURED) {
     continueAsGuest();
   }
@@ -727,10 +735,11 @@ if (useCloud && auth) {
 // ── EXPOSE AUTH ACTIONS ──
 window.loginGoogle = async () => {
   if (!useCloud) { continueAsGuest(); return; }
-  showLoading("Mit Google anmelden…");
+  showLoading("Weiterleiten zu Google…");
   try {
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    await signInWithRedirect(auth, provider);
+    // Page will reload after redirect — onAuthStateChanged handles the result
   } catch(e) {
     hideLoading();
     showToast("Anmeldung fehlgeschlagen: " + e.message, 'error');
@@ -739,12 +748,13 @@ window.loginGoogle = async () => {
 
 window.loginApple = async () => {
   if (!useCloud) { continueAsGuest(); return; }
-  showLoading("Mit Apple anmelden…");
+  showLoading("Weiterleiten zu Apple…");
   try {
     const provider = new OAuthProvider('apple.com');
     provider.addScope('email');
     provider.addScope('name');
-    await signInWithPopup(auth, provider);
+    await signInWithRedirect(auth, provider);
+    // Page will reload after redirect — onAuthStateChanged handles the result
   } catch(e) {
     hideLoading();
     showToast("Apple-Anmeldung fehlgeschlagen: " + e.message, 'error');
