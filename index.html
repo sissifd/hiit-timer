@@ -550,8 +550,8 @@
 
     <!-- Mode Toggle -->
     <div class="mode-toggle">
-      <button class="mode-btn active" id="mode-standard-btn" onclick="setMode('standard')">Standard</button>
-      <button class="mode-btn" id="mode-progressive-btn" onclick="setMode('progressive')">Progressiv</button>
+      <button class="mode-btn active" id="mode-standard-btn">Standard</button>
+      <button class="mode-btn" id="mode-progressive-btn">Progressiv</button>
     </div>
 
     <!-- STANDARD MODE -->
@@ -927,6 +927,14 @@ addExercise('Burpees', 30);
 addExercise('Mountain Climbers', 40);
 addExercise('Jump Squats', 30);
 
+// Wire mode toggle via addEventListener (more reliable than inline onclick on iOS)
+document.addEventListener('DOMContentLoaded', function() {
+  const stdBtn  = document.getElementById('mode-standard-btn');
+  const progBtn = document.getElementById('mode-progressive-btn');
+  if (stdBtn)  stdBtn.addEventListener('click',  function() { setMode('standard'); });
+  if (progBtn) progBtn.addEventListener('click',  function() { setMode('progressive'); });
+});
+
 // ── LOCAL STORAGE ──
 function lsGet(key) { try { return JSON.parse(localStorage.getItem(key)||'[]'); } catch { return []; } }
 function lsSet(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
@@ -1073,7 +1081,7 @@ function loadWorkout(w) {
 }
 
 async function deleteSaved(id) {
-  if(!confirm('Workout löschen?')) return;
+  showConfirm('Workout löschen', 'Dieses Workout wird dauerhaft gelöscht.', async () => {
   const uid = window._fb?.currentUser?.uid;
   if (!isGuest && uid && window._fb?.useCloud) {
     showLoading('Löschen…');
@@ -1126,7 +1134,7 @@ async function renderHistory() {
 }
 
 async function clearHistory() {
-  if(!confirm('Gesamten Verlauf löschen?')) return;
+  showConfirm('Verlauf löschen', 'Der gesamte Workout-Verlauf wird unwiderruflich gelöscht.', async () => {
   const uid = window._fb?.currentUser?.uid;
   if (!isGuest && uid && window._fb?.useCloud) {
     showLoading('Löschen…');
@@ -1364,6 +1372,20 @@ function goToHistory() {
   showPage('history');
 }
 
+// ── CONFIRM MODAL (replaces browser confirm()) ──
+function showConfirm(title, message, onConfirm) {
+  const overlay = document.getElementById('confirm-modal');
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-message').textContent = message;
+  overlay.classList.add('open');
+  const okBtn     = document.getElementById('confirm-ok-btn');
+  const cancelBtn = document.getElementById('confirm-cancel-btn');
+  const cleanup = () => { overlay.classList.remove('open'); okBtn.replaceWith(okBtn.cloneNode(true)); cancelBtn.replaceWith(cancelBtn.cloneNode(true)); };
+  document.getElementById('confirm-ok-btn').addEventListener('click', () => { cleanup(); onConfirm(); });
+  document.getElementById('confirm-cancel-btn').addEventListener('click', cleanup);
+  overlay.addEventListener('click', e => { if(e.target === overlay) cleanup(); }, { once: true });
+}
+
 // ── UTILS ──
 function fmtDate(iso) {
   if (!iso) return '–';
@@ -1534,5 +1556,17 @@ window.addEventListener('online',  () => showToast('✅ Wieder online'));
 window.addEventListener('offline', updateOnlineStatus);
 <\/script>
 
+
+<!-- ══ CONFIRM MODAL ══ -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal">
+    <h3 id="confirm-title">Bestätigen</h3>
+    <p id="confirm-message" style="color:var(--muted);font-size:14px;margin-bottom:4px"></p>
+    <div class="modal-actions">
+      <button class="modal-cancel" id="confirm-cancel-btn">Abbrechen</button>
+      <button class="modal-confirm" id="confirm-ok-btn" style="background:linear-gradient(135deg,var(--accent),#c0392b)">LÖSCHEN</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
