@@ -218,6 +218,8 @@ input:focus{border-color:var(--red)}
 .gym-ex-footer button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:4px;transition:color .2s}
 .gym-ex-footer .del-ex:hover{color:var(--red)}
 .gym-ex-footer .add-set:hover{color:var(--blue)}
+.btn-del-set{background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:16px;font-weight:500;width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;line-height:1;padding:0}
+.btn-del-set:hover{background:#ff3d3d22;border-color:var(--red);color:var(--red)}
 
 /* GYM SESSION VIEW (fullscreen workout tracker) */
 #view-gym{display:none;position:fixed;inset:0;background:var(--bg);z-index:200;flex-direction:column;overflow-y:auto}
@@ -349,6 +351,23 @@ input:focus{border-color:var(--red)}
   .done-val{font-size:36px}
   .nav-tab{font-size:13px;padding:7px 10px;letter-spacing:1px}
 }
+
+/* TEMPLATES PAGE */
+.tpl-section-title{font-family:'Bebas Neue',cursive;font-size:14px;letter-spacing:3px;color:var(--muted);margin:20px 0 10px;padding-left:2px}
+.tpl-section-title:first-child{margin-top:0}
+.tpl-grid{display:flex;flex-direction:column;gap:10px;margin-bottom:4px}
+.tpl-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;cursor:pointer;transition:border-color .2s,transform .15s;position:relative;overflow:hidden}
+.tpl-card::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:var(--tpl-color,var(--red))}
+.tpl-card:active{transform:scale(.98)}
+.tpl-card:hover{border-color:#3a3a50}
+.tpl-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.tpl-card-left{padding-left:10px}
+.tpl-name{font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;line-height:1.1}
+.tpl-desc{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
+.tpl-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;padding-left:10px}
+.tpl-tag{background:var(--surface);border:1px solid var(--border);border-radius:20px;font-size:11px;padding:2px 9px;color:var(--muted)}
+.tpl-load-btn{background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-family:'Bebas Neue',cursive;font-size:13px;letter-spacing:1px;padding:7px 12px;white-space:nowrap;transition:all .2s;flex-shrink:0}
+.tpl-load-btn:hover{background:var(--tpl-color,var(--red));border-color:var(--tpl-color,var(--red));color:#fff}
 </style>
 </head>
 <body>
@@ -381,6 +400,7 @@ input:focus{border-color:var(--red)}
   <nav id="nav">
     <div class="nav-tabs">
       <button class="nav-tab" data-page="setup">⚡ Workout</button>
+      <button class="nav-tab" data-page="templates">📋 Vorlagen</button>
       <button class="nav-tab" data-page="saved">📁 Gespeichert</button>
       <button class="nav-tab" data-page="history">📊 Verlauf</button>
     </div>
@@ -468,9 +488,15 @@ input:focus{border-color:var(--red)}
     </div>
   </div>
 
+  <!-- TEMPLATES PAGE -->
+  <div class="page" id="page-templates">
+    <div class="page-hdr"><h1>Vorlagen</h1><p>Vorgefertigte Trainingspläne</p></div>
+    <div id="templates-container"></div>
+  </div>
+
   <!-- SAVED PAGE -->
   <div class="page" id="page-saved">
-    <div class="page-hdr"><h1>Gespeichert</h1><p>Deine Vorlagen</p></div>
+    <div class="page-hdr"><h1>Gespeichert</h1><p>Deine Workouts</p></div>
     <div id="saved-container"></div>
   </div>
 
@@ -556,7 +582,7 @@ input:focus{border-color:var(--red)}
     <p  id="conf-msg"></p>
     <div class="confirm-btns">
       <button class="btn-cancel"  id="conf-cancel">Abbrechen</button>
-      <button class="btn-confirm" id="conf-ok">LÖSCHEN</button>
+      <button class="btn-confirm" id="conf-ok">BESTÄTIGEN</button>
     </div>
   </div>
 </div>
@@ -747,8 +773,9 @@ function goPage(name) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('on',t.dataset.page===name));
   document.getElementById('page-'+name).classList.add('on');
-  if (name==='saved')   renderSaved();
-  if (name==='history') renderHistory();
+  if (name==='templates') renderTemplates();
+  if (name==='saved')     renderSaved();
+  if (name==='history')   renderHistory();
   closeMenu();
 }
 document.getElementById('user-chip').addEventListener('click',()=>document.getElementById('user-menu').classList.toggle('on'));
@@ -846,12 +873,13 @@ function renderGymEx() {
     const card=document.createElement('div'); card.className='gym-ex-card';
     let setsHtml='';
     ex.sets.forEach((s,si)=>{
-      setsHtml+=`<div class="gym-set-row">
+      setsHtml+=`<div class="gym-set-row" data-si="${si}">
         <span class="gym-set-num">S${si+1}</span>
         <div class="gym-set-inputs">
           <div class="fg"><label>Gewicht (kg)</label><input type="number" class="set-weight" value="${s.weight}" min="0" step="0.5" placeholder="–"></div>
           <div class="fg"><label>Wiederholungen</label><input type="number" class="set-reps" value="${s.reps}" min="1" placeholder="–"></div>
         </div>
+        ${ex.sets.length > 1 ? `<button class="btn-del-set" data-si="${si}" title="Set entfernen">−</button>` : '<span style="width:26px"></span>'}
       </div>`;
     });
     card.innerHTML=`<div class="gym-ex-header">
@@ -875,6 +903,11 @@ function renderGymEx() {
     card.querySelector('.add-set').addEventListener('click',()=>{gymExercises[ei].sets.push({weight:'',reps:''});renderGymEx();});
     card.querySelectorAll('.set-weight').forEach((inp,si)=>inp.addEventListener('input',ev=>{gymExercises[ei].sets[si].weight=ev.target.value;}));
     card.querySelectorAll('.set-reps').forEach((inp,si)=>inp.addEventListener('input',ev=>{gymExercises[ei].sets[si].reps=ev.target.value;}));
+    card.querySelectorAll('.btn-del-set').forEach(btn=>btn.addEventListener('click',()=>{
+      const si=+btn.dataset.si;
+      gymExercises[ei].sets.splice(si,1);
+      renderGymEx();
+    }));
     list.appendChild(card);
   });
 }
@@ -1034,6 +1067,236 @@ async function doDeleteSaved(id) {
   renderSaved();
 }
 
+// ═══ WORKOUT TEMPLATES ════════════════════════════
+const WORKOUT_TEMPLATES = [
+  // ── GYM SPLITS ──────────────────────────────────
+  {
+    id:'push', name:'Push Day', type:'gym', color:'#3b82f6',
+    category:'Gym Splits',
+    desc:'Brust, Schultern & Trizeps — klassischer Push Day',
+    tags:['🏋 Gym','Oberkörper','~60 Min'],
+    exercises:[
+      {name:'Bankdrücken',         sets:[{weight:'',reps:'8'},{weight:'',reps:'8'},{weight:'',reps:'8'}]},
+      {name:'Schrägbankdrücken',   sets:[{weight:'',reps:'10'},{weight:'',reps:'10'},{weight:'',reps:'10'}]},
+      {name:'Schulterdrücken',     sets:[{weight:'',reps:'10'},{weight:'',reps:'10'},{weight:'',reps:'10'}]},
+      {name:'Seitheben',           sets:[{weight:'',reps:'12'},{weight:'',reps:'12'},{weight:'',reps:'12'}]},
+      {name:'Trizepsdrücken',      sets:[{weight:'',reps:'12'},{weight:'',reps:'12'},{weight:'',reps:'12'}]},
+      {name:'Skull Crusher',       sets:[{weight:'',reps:'10'},{weight:'',reps:'10'},{weight:'',reps:'10'}]},
+    ]
+  },
+  {
+    id:'pull', name:'Pull Day', type:'gym', color:'#7b61ff',
+    category:'Gym Splits',
+    desc:'Rücken & Bizeps — klassischer Pull Day',
+    tags:['🏋 Gym','Rücken','~60 Min'],
+    exercises:[
+      {name:'Klimmzüge',               sets:[{weight:'',reps:'8'},{weight:'',reps:'8'},{weight:'',reps:'8'}]},
+      {name:'Latzug',                  sets:[{weight:'',reps:'10'},{weight:'',reps:'10'},{weight:'',reps:'10'}]},
+      {name:'Rudern (Langhantel)',      sets:[{weight:'',reps:'8'},{weight:'',reps:'8'},{weight:'',reps:'8'}]},
+      {name:'Rudern (Kabel)',           sets:[{weight:'',reps:'12'},{weight:'',reps:'12'},{weight:'',reps:'12'}]},
+      {name:'Bizepscurl (Langhantel)', sets:[{weight:'',reps:'10'},{weight:'',reps:'10'},{weight:'',reps:'10'}]},
+      {name:'Hammercurl',              sets:[{weight:'',reps:'12'},{weight:'',reps:'12'},{weight:'',reps:'12'}]},
+    ]
+  },
+  {
+    id:'legs', name:'Leg Day', type:'gym', color:'#ff8c00',
+    category:'Gym Splits',
+    desc:'Quadrizeps, Hamstrings, Gesäß & Waden',
+    tags:['🏋 Gym','Beine','~60 Min'],
+    exercises:[
+      {name:'Kniebeugen',          sets:[{weight:'',reps:'8'},{weight:'',reps:'8'},{weight:'',reps:'8'}]},
+      {name:'Beinpresse',          sets:[{weight:'',reps:'10'},{weight:'',reps:'10'},{weight:'',reps:'10'}]},
+      {name:'Romanian Deadlift',   sets:[{weight:'',reps:'10'},{weight:'',reps:'10'},{weight:'',reps:'10'}]},
+      {name:'Beinstrecker',        sets:[{weight:'',reps:'12'},{weight:'',reps:'12'},{weight:'',reps:'12'}]},
+      {name:'Beinbeuger',          sets:[{weight:'',reps:'12'},{weight:'',reps:'12'},{weight:'',reps:'12'}]},
+      {name:'Wadenheben',          sets:[{weight:'',reps:'15'},{weight:'',reps:'15'},{weight:'',reps:'15'}]},
+    ]
+  },
+  {
+    id:'upper', name:'Oberkörper', type:'gym', color:'#00c9a7',
+    category:'Gym Splits',
+    desc:'Komplett-Training für den ganzen Oberkörper',
+    tags:['🏋 Gym','Oberkörper','~70 Min'],
+    exercises:[
+      {name:'Bankdrücken',             sets:[{weight:'',reps:'8'},{weight:'',reps:'8'},{weight:'',reps:'8'}]},
+      {name:'Klimmzüge',               sets:[{weight:'',reps:'8'},{weight:'',reps:'8'},{weight:'',reps:'8'}]},
+      {name:'Schulterdrücken',         sets:[{weight:'',reps:'10'},{weight:'',reps:'10'},{weight:'',reps:'10'}]},
+      {name:'Rudern (Kabel)',           sets:[{weight:'',reps:'10'},{weight:'',reps:'10'},{weight:'',reps:'10'}]},
+      {name:'Bizepscurl (Kurzhantel)', sets:[{weight:'',reps:'12'},{weight:'',reps:'12'},{weight:'',reps:'12'}]},
+      {name:'Trizepsdrücken',          sets:[{weight:'',reps:'12'},{weight:'',reps:'12'},{weight:'',reps:'12'}]},
+    ]
+  },
+  {
+    id:'fullbody', name:'Ganzkörper', type:'gym', color:'#ff3d3d',
+    category:'Gym Splits',
+    desc:'Effizientes Ganzkörper-Training — ideal 3×/Woche',
+    tags:['🏋 Gym','Ganzkörper','~50 Min'],
+    exercises:[
+      {name:'Kniebeugen',          sets:[{weight:'',reps:'8'},{weight:'',reps:'8'},{weight:'',reps:'8'}]},
+      {name:'Bankdrücken',         sets:[{weight:'',reps:'8'},{weight:'',reps:'8'},{weight:'',reps:'8'}]},
+      {name:'Kreuzheben',          sets:[{weight:'',reps:'6'},{weight:'',reps:'6'},{weight:'',reps:'6'}]},
+      {name:'Schulterdrücken',     sets:[{weight:'',reps:'10'},{weight:'',reps:'10'},{weight:'',reps:'10'}]},
+      {name:'Rudern (Langhantel)', sets:[{weight:'',reps:'10'},{weight:'',reps:'10'},{weight:'',reps:'10'}]},
+    ]
+  },
+  {
+    id:'back-focus', name:'Rücken & Core', type:'gym', color:'#7b61ff',
+    category:'Gym Splits',
+    desc:'Fokus Rücken mit Corearbeit zum Abschluss',
+    tags:['🏋 Gym','Rücken','Core','~55 Min'],
+    exercises:[
+      {name:'Kreuzheben',        sets:[{weight:'',reps:'6'},{weight:'',reps:'6'},{weight:'',reps:'6'}]},
+      {name:'Klimmzüge',         sets:[{weight:'',reps:'8'},{weight:'',reps:'8'},{weight:'',reps:'8'}]},
+      {name:'Latzug',            sets:[{weight:'',reps:'10'},{weight:'',reps:'10'},{weight:'',reps:'10'}]},
+      {name:'Hyperextension',    sets:[{weight:'',reps:'12'},{weight:'',reps:'12'},{weight:'',reps:'12'}]},
+      {name:'Plank',             sets:[{weight:'',reps:'60'},{weight:'',reps:'60'},{weight:'',reps:'60'}]},
+      {name:'Russian Twist',     sets:[{weight:'',reps:'20'},{weight:'',reps:'20'},{weight:'',reps:'20'}]},
+    ]
+  },
+  // ── HIIT TEMPLATES ──────────────────────────────
+  {
+    id:'hiit-classic', name:'Classic HIIT', type:'hiit', color:'#ff3d3d',
+    category:'HIIT & Cardio',
+    desc:'Klassisches Intervalltraining — 3 Runden, 30s Arbeit / 15s Pause',
+    tags:['⏱ HIIT','Ganzkörper','~20 Min'],
+    hiitConfig:{
+      mode:'standard', rounds:3, restBetween:15, restSets:60,
+      exercises:[
+        {name:'Burpees',duration:30},{name:'Mountain Climbers',duration:30},
+        {name:'Jump Squats',duration:30},{name:'High Knees',duration:30},
+        {name:'Jumping Jacks',duration:30},
+      ]
+    }
+  },
+  {
+    id:'hiit-tabata', name:'Tabata', type:'hiit', color:'#ff8c00',
+    category:'HIIT & Cardio',
+    desc:'20s Vollgas, 10s Pause — 8 Runden pro Übung. Brutal effektiv.',
+    tags:['⏱ HIIT','Intensiv','~16 Min'],
+    hiitConfig:{
+      mode:'standard', rounds:8, restBetween:10, restSets:60,
+      exercises:[
+        {name:'Burpees',duration:20},{name:'Jump Squats',duration:20},
+        {name:'Mountain Climbers',duration:20},
+      ]
+    }
+  },
+  {
+    id:'hiit-progressive', name:'Progressive Runden', type:'hiit', color:'#7b61ff',
+    category:'HIIT & Cardio',
+    desc:'30s Arbeit, Pause startet bei 30s und sinkt um 5s — bis kein Rest mehr bleibt.',
+    tags:['⏱ HIIT','Progressiv','~25 Min'],
+    hiitConfig:{
+      mode:'progressive', progWork:30, progRestStart:30, progRestStep:5, restSets:90,
+      exercises:[
+        {name:'Burpees',duration:30},{name:'Mountain Climbers',duration:30},
+        {name:'Jump Squats',duration:30},{name:'High Knees',duration:30},
+        {name:'Jumping Jacks',duration:30},{name:'Box Jumps',duration:30},
+      ]
+    }
+  },
+  {
+    id:'hiit-cardio', name:'Ausdauer Circuit', type:'hiit', color:'#00c9a7',
+    category:'HIIT & Cardio',
+    desc:'Längere Intervalle, mehr Sets — ideal für Ausdaueraufbau',
+    tags:['⏱ HIIT','Ausdauer','~30 Min'],
+    hiitConfig:{
+      mode:'standard', rounds:4, restBetween:20, restSets:90,
+      exercises:[
+        {name:'Seilspringen',duration:45},{name:'Burpees',duration:45},
+        {name:'Mountain Climbers',duration:45},{name:'Jumping Jacks',duration:45},
+      ]
+    }
+  },
+];
+
+function renderTemplates() {
+  const c = document.getElementById('templates-container');
+  // Group by category
+  const categories = [...new Set(WORKOUT_TEMPLATES.map(t => t.category))];
+  let html = '';
+  c.innerHTML = '';
+
+  categories.forEach(cat => {
+    const section = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'tpl-section-title';
+    title.textContent = cat;
+    section.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'tpl-grid';
+
+    WORKOUT_TEMPLATES.filter(t => t.category === cat).forEach(tpl => {
+      const card = document.createElement('div');
+      card.className = 'tpl-card';
+      card.style.setProperty('--tpl-color', tpl.color);
+      const exPreview = tpl.type === 'gym'
+        ? tpl.exercises.slice(0,3).map(e=>`<span class="tpl-tag">${e.name}</span>`).join('')
+          + (tpl.exercises.length > 3 ? `<span class="tpl-tag">+${tpl.exercises.length-3} mehr</span>` : '')
+        : tpl.hiitConfig.exercises.slice(0,3).map(e=>`<span class="tpl-tag">${e.name}</span>`).join('')
+          + (tpl.hiitConfig.exercises.length > 3 ? `<span class="tpl-tag">+${tpl.hiitConfig.exercises.length-3} mehr</span>` : '');
+      card.innerHTML = `
+        <div class="tpl-card-top">
+          <div class="tpl-card-left">
+            <div class="tpl-name">${tpl.name}</div>
+            <div class="tpl-desc">${tpl.desc}</div>
+          </div>
+          <button class="tpl-load-btn">Laden ↗</button>
+        </div>
+        <div class="tpl-meta">
+          ${tpl.tags.map(t=>`<span class="tpl-tag">${t}</span>`).join('')}
+        </div>
+        <div class="tpl-meta" style="margin-top:6px">${exPreview}</div>`;
+      card.querySelector('.tpl-load-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        loadTemplate(tpl);
+      });
+      card.addEventListener('click', () => loadTemplate(tpl));
+      grid.appendChild(card);
+    });
+    section.appendChild(grid);
+    c.appendChild(section);
+  });
+}
+
+function loadTemplate(tpl) {
+  if (tpl.type === 'gym') {
+    setAppMode('gym');
+    document.getElementById('gym-workout-name').value = tpl.name;
+    gymExercises = []; gymExCounter = 0;
+    tpl.exercises.forEach(e => {
+      gymExCounter++;
+      gymExercises.push({ id: gymExCounter, name: e.name, sets: e.sets.map(s => ({...s})) });
+    });
+    renderGymEx();
+  } else {
+    // HIIT
+    setAppMode('hiit');
+    document.getElementById('workout-name').value = tpl.name;
+    hiitExercises = []; exCounter = 0;
+    const cfg = tpl.hiitConfig;
+    cfg.exercises.forEach(e => addHiitEx(e.name, e.duration));
+    workoutMode = cfg.mode;
+    document.querySelectorAll('.mode-tab').forEach(b => b.classList.toggle('on', b.dataset.mode === workoutMode));
+    document.getElementById('mode-standard').style.display    = cfg.mode === 'standard'    ? 'block' : 'none';
+    document.getElementById('mode-progressive').style.display = cfg.mode === 'progressive' ? 'block' : 'none';
+    if (cfg.mode === 'progressive') {
+      document.getElementById('prog-work').value        = cfg.progWork;
+      document.getElementById('prog-rest-start').value  = cfg.progRestStart;
+      document.getElementById('prog-rest-step').value   = cfg.progRestStep;
+      document.getElementById('prog-rest-sets').value   = cfg.restSets;
+      refreshProgPreview();
+    } else {
+      document.getElementById('rounds').value       = cfg.rounds;
+      document.getElementById('rest-between').value = cfg.restBetween;
+      document.getElementById('rest-sets').value    = cfg.restSets;
+    }
+  }
+  showToast(`✅ "${tpl.name}" geladen!`);
+  goPage('setup');
+}
+
 // ═══ RENDER HISTORY ═══════════════════════════════
 async function renderHistory() {
   const c=document.getElementById('history-container');
@@ -1094,7 +1357,8 @@ async function startGymSession() {
   gymLastSession = await loadLastGymSession(document.getElementById('gym-workout-name').value.trim()||'Gym Workout');
   gymSessionData={};
   gymExercises.forEach((ex,ei)=>{
-    gymSessionData[ei]=ex.sets.map(()=>({weight:'',reps:'',done:false}));
+    // Pre-fill session with values already entered in the config
+    gymSessionData[ei]=ex.sets.map(s=>({weight:s.weight||'',reps:s.reps||'',done:false}));
   });
   gymStartTime=Date.now();
   document.getElementById('gym-sess-title').textContent=document.getElementById('gym-workout-name').value.trim()||'Gym Workout';
@@ -1169,7 +1433,7 @@ function renderGymSession() {
 }
 
 document.getElementById('btn-finish-gym').addEventListener('click',()=>{
-  askConfirm('Training beenden?','Das Training wird als abgeschlossen gespeichert.',finishGymSession);
+  askConfirm('Training beenden?','Das Training wird als abgeschlossen gespeichert.',finishGymSession,'FERTIG');
 });
 
 async function finishGymSession() {
@@ -1328,9 +1592,10 @@ document.getElementById('done-hist').addEventListener('click',()=>{
 });
 
 // ═══ CONFIRM ══════════════════════════════════════
-function askConfirm(title,msg,onOk) {
+function askConfirm(title,msg,onOk,btnLabel='LÖSCHEN') {
   document.getElementById('conf-title').textContent=title;
   document.getElementById('conf-msg').textContent=msg;
+  document.getElementById('conf-ok').textContent=btnLabel;
   const modal=document.getElementById('confirm-modal'); modal.classList.add('on');
   const close=()=>modal.classList.remove('on');
   const ok2=document.getElementById('conf-ok').cloneNode(true);
