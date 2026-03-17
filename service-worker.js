@@ -1,6 +1,6 @@
-// HIIT Timer Service Worker
+// FitTrack Service Worker
 // Version — bump this to force cache refresh after updates
-const CACHE_VERSION = 'hiit-v2';
+const CACHE_VERSION = 'fittrack-v1';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const FONT_CACHE    = `${CACHE_VERSION}-fonts`;
 
@@ -27,7 +27,7 @@ self.addEventListener('activate', event => {
     caches.keys().then(keys =>
       Promise.all(
         keys
-          .filter(key => key.startsWith('hiit-') && key !== STATIC_CACHE && key !== FONT_CACHE)
+          .filter(key => (key.startsWith('hiit-') || key.startsWith('fittrack-')) && key !== STATIC_CACHE && key !== FONT_CACHE)
           .map(key => caches.delete(key))
       )
     ).then(() => self.clients.claim())
@@ -70,40 +70,31 @@ self.addEventListener('fetch', event => {
     caches.match(request).then(cached => {
       if (cached) return cached;
       return fetch(request).then(response => {
-        // Cache successful GET responses
         if (request.method === 'GET' && response.status === 200) {
           caches.open(STATIC_CACHE).then(cache => cache.put(request, response.clone()));
         }
         return response;
       }).catch(() => {
-        // Offline fallback: return index.html for navigation requests
-        if (request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
+        if (request.mode === 'navigate') return caches.match('/index.html');
         return new Response('Offline', { status: 503 });
       });
     })
   );
 });
 
-// ── BACKGROUND SYNC: re-save pending data when back online ──
+// ── BACKGROUND SYNC ──
 self.addEventListener('sync', event => {
   if (event.tag === 'sync-workouts') {
-    event.waitUntil(syncPendingData());
+    event.waitUntil(Promise.resolve());
   }
 });
-
-async function syncPendingData() {
-  // Handled by the app itself via Firestore's offline persistence
-  console.log('[SW] Background sync triggered');
-}
 
 // ── PUSH NOTIFICATIONS (future use) ──
 self.addEventListener('push', event => {
   if (!event.data) return;
   const data = event.data.json();
   event.waitUntil(
-    self.registration.showNotification(data.title || 'HIIT Timer', {
+    self.registration.showNotification(data.title || 'FitTrack', {
       body: data.body || 'Zeit für dein Workout! 💪',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-72.png',
