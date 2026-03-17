@@ -1,7 +1,7 @@
 {
-  "name": "HIIT Timer",
-  "short_name": "HIIT",
-  "description": "Dein persönlicher Interval-Timer für HIIT Workouts",
+  "name": "Fit Track",
+  "short_name": "FITT",
+  "description": "Dein persönlicher Fitness Begleiter",
   "start_url": "/index.html",
   "display": "standalone",
   "orientation": "portrait",
